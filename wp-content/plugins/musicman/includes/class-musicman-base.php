@@ -115,11 +115,11 @@ abstract class MusicMan_Base
     private function generate_post_title($post_type, $data)
     {
         switch ($post_type) {
-            case 'music_track':
+            case 'musicman_track':
                 return ($data['trackName'] ?? 'Unknown Track') . ' – ' . ($data['artistName'] ?? 'Unknown Artist');
-            case 'music_artist':
+            case 'musicman_artist':
                 return $data['artistName'] ?? 'Unknown Artist';
-            case 'music_collection':
+            case 'musicman_collection':
                 return $data['collectionName'] ?? 'Unknown Album';
             default:
                 return 'Untitled';
@@ -154,9 +154,9 @@ abstract class MusicMan_Base
 
     protected function get_child_track_ids($parent_id, $parent_type)
     {
-        $meta_key = ($parent_type === 'music_artist') ? '_artist_post_id' : '_collection_post_id';
+        $meta_key = ($parent_type === 'musicman_artist') ? '_artist_post_id' : '_collection_post_id';
         return get_posts([
-            'post_type'      => 'music_track',
+            'post_type'      => 'musicman_track',
             'posts_per_page' => -1,
             'post_status'    => 'any',
             'meta_key'       => $meta_key,
@@ -165,8 +165,7 @@ abstract class MusicMan_Base
         ]);
     }
 
-    public function enqueue_assets($post_type)
-    {
+    public function enqueue_assets($post_type) {
         wp_enqueue_script(
             'musicman-admin',
             MUSICMAN_URL . 'assets/admin.js',

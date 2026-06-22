@@ -21,7 +21,7 @@ class MusicMan_Artist extends MusicMan_Base
 
         add_filter('manage_' . self::POST_TYPE . '_posts_columns', [$this, 'columns']);
         add_action('manage_' . self::POST_TYPE . '_posts_custom_column', [$this, 'column_content'], 10, 2);
-        add_filter('use_block_editor_for_post_type', [$this, 'disable_gutenberg'], 10, 2);
+        add_filter('use_block_editor_for_post_type', '__return_false', 100);
         add_filter('default_comment_status', [$this, 'enable_comments'], 10, 2);
 
         add_action('admin_menu', function () {
@@ -54,7 +54,7 @@ class MusicMan_Artist extends MusicMan_Base
             'has_archive' => true,
             'menu_icon' => 'dashicons-admin-users',
             'supports' => ['title', 'editor', 'thumbnail', 'custom-fields', 'comments'],
-            'show_in_rest' => false,
+            'show_in_rest' => true,
             'rewrite' => ['slug' => 'artist'],
         ]);
     }
@@ -66,26 +66,26 @@ class MusicMan_Artist extends MusicMan_Base
                 'object_subtype' => self::POST_TYPE,
                 'type' => 'string',
                 'single' => true,
-                'show_in_rest' => false,
+                'show_in_rest' => true,
             ]);
         }
         register_meta('post', '_album_ids', [
             'object_subtype' => self::POST_TYPE,
             'type' => 'array',
             'single' => true,
-            'show_in_rest' => false,
+            'show_in_rest' => true,
         ]);
         register_meta('post', '_imported', [
             'object_subtype' => self::POST_TYPE,
             'type' => 'boolean',
             'single' => true,
-            'show_in_rest' => false,
+            'show_in_rest' => true,
         ]);
         register_meta('post', '_pending_crawl', [
             'object_subtype' => self::POST_TYPE,
             'type' => 'boolean',
             'single' => true,
-            'show_in_rest' => false,
+            'show_in_rest' => true,
         ]);
     }
 

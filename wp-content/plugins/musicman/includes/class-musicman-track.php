@@ -39,7 +39,7 @@ class MusicMan_Track extends MusicMan_Base
 
         add_filter('manage_' . self::POST_TYPE . '_posts_columns', [$this, 'columns']);
         add_action('manage_' . self::POST_TYPE . '_posts_custom_column', [$this, 'column_content'], 10, 2);
-        add_filter('use_block_editor_for_post_type', [$this, 'disable_gutenberg'], 10, 2);
+        add_filter('use_block_editor_for_post_type', '__return_false', 100);
         add_filter('default_comment_status', [$this, 'enable_comments'], 10, 2);
 
         add_action('admin_menu', function () {

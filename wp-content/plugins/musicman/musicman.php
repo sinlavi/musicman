@@ -30,6 +30,9 @@ class MusicMan {
 		register_activation_hook( __FILE__, [ $this, 'activate' ] );
 
 		add_action( 'plugins_loaded', [ $this, 'init_components' ] );
+        add_filter( 'template_include', [ $this, 'load_templates' ] );
+        add_action( 'admin_enqueue_scripts', [ $this, 'admin_scripts' ] );
+        add_action( 'admin_head', [ $this, 'admin_custom_css' ] );
 	}
 
 	private function includes() {
@@ -46,6 +49,48 @@ class MusicMan {
 		new MusicMan_Collection();
 	}
 
+    public function admin_scripts( $hook ) {
+        if ( strpos( $hook, 'musicman-crawler' ) !== false ) {
+            wp_enqueue_style( 'musicman-crawler-style', MUSICMAN_URL . 'assets/crawler-admin.css', [], MUSICMAN_VERSION );
+            wp_enqueue_script( 'musicman-crawler-js', MUSICMAN_URL . 'assets/crawler-admin.js', [ 'jquery' ], MUSICMAN_VERSION, true );
+            wp_localize_script( 'musicman-crawler-js', 'musicmanCrawler', [
+                'root' => esc_url_raw( rest_url() ),
+                'nonce' => wp_create_nonce( 'wp_rest' )
+            ] );
+        }
+    }
+
+    public function admin_custom_css() {
+        ?>
+        <style>
+            #toplevel_page_musicman .wp-menu-image img { padding: 0; }
+            .status-badge { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+            .status-pending { background: #fff3cd; color: #856404; }
+            .status-downloading { background: #cce5ff; color: #004085; }
+            .status-completed { background: #d4edda; color: #155724; }
+            .status-failed { background: #f8d7da; color: #721c24; }
+
+            /* phpMyAdmin style for list tables */
+            .wp-list-table.widefat.fixed.striped { border: 1px solid #c3c4c7; box-shadow: none; }
+            .wp-list-table th { background: #f0f0f1; border-bottom: 1px solid #c3c4c7 !important; }
+            .wp-list-table td { border-bottom: 1px solid #f0f0f1; }
+
+            /* Legacy Editor Improvements */
+            .post-type-musicman_track #postbox-container-2 .postbox,
+            .post-type-musicman_artist #postbox-container-2 .postbox,
+            .post-type-musicman_collection #postbox-container-2 .postbox {
+                border: 1px solid #c3c4c7;
+                box-shadow: none;
+            }
+            .post-type-musicman_track .inside,
+            .post-type-musicman_artist .inside,
+            .post-type-musicman_collection .inside {
+                padding: 12px;
+            }
+        </style>
+        <?php
+    }
+
 	public function add_admin_menu() {
 		add_menu_page(
 			'MusicMan',
@@ -55,6 +100,15 @@ class MusicMan {
 			[ $this, 'dashboard_page_html' ],
 			'dashicons-format-audio'
 		);
+
+        add_submenu_page(
+            'musicman',
+            'Crawler',
+            'Crawler',
+            'manage_options',
+            'musicman-crawler',
+            [ $this, 'crawler_page_html' ]
+        );
 
 		add_submenu_page(
 			'musicman',
@@ -134,23 +188,78 @@ class MusicMan {
                     ?>
                 </tbody>
             </table>
-
-            <style>
-                .status-badge {
-                    padding: 2px 8px;
-                    border-radius: 4px;
-                    font-size: 11px;
-                    font-weight: bold;
-                    text-transform: uppercase;
-                }
-                .status-pending { background: #fff3cd; color: #856404; }
-                .status-downloading { background: #cce5ff; color: #004085; }
-                .status-completed { background: #d4edda; color: #155724; }
-                .status-failed { background: #f8d7da; color: #721c24; }
-            </style>
 		</div>
 		<?php
 	}
+
+    public function crawler_page_html() {
+        if ( ! current_user_can( 'manage_options' ) ) return;
+        ?>
+        <div class="pmah-layout" style="height: calc(100vh - 32px); margin-left: -20px;">
+          <!-- Left Nav -->
+          <div class="left-nav" id="leftSidebar">
+            <div class="left-header">
+              <i class="dashicons dashicons-format-audio"></i>
+              <span>Crawler</span>
+              <span class="badge" id="treeTotalCount">0 items</span>
+            </div>
+            <div class="search-panel">
+              <input type="text" id="searchTerm" placeholder="Search criteria..." value="Pink Floyd" />
+              <div class="search-row">
+                <select id="entityType">
+                  <option value="musicArtist,album,song">All Types</option>
+                  <option value="musicArtist">Artists</option>
+                  <option value="album">Albums</option>
+                  <option value="song">Tracks</option>
+                </select>
+              </div>
+              <button id="doSearchBtn" class="button button-primary"><i class="dashicons dashicons-search"></i> Query Database</button>
+            </div>
+            <div class="tree-container" id="treeContainer">
+              <div class="empty-msg">Execute query above to construct tree nodes.</div>
+            </div>
+            <div id="treeBulkBar" class="bulk-bar" style="display:none;">
+              <span id="treeSelectedCount">0</span> selected
+              <button id="treeBulkAddBtn" class="button button-small">Import</button>
+            </div>
+          </div>
+
+          <!-- Main Content -->
+          <div class="main-content">
+            <div class="tabs" style="display: flex; background: #f0f0f1; border-bottom: 1px solid #c3c4c7; padding: 5px 10px 0;">
+                <div class="tab active" data-tab="browse" style="padding: 8px 15px; background: #fff; border: 1px solid #c3c4c7; border-bottom: none; cursor: pointer; margin-right: 5px; border-radius: 4px 4px 0 0;">Browse</div>
+                <div class="tab" data-tab="queue" style="padding: 8px 15px; background: #e0e0e0; border: 1px solid #c3c4c7; border-bottom: none; cursor: pointer; margin-right: 5px; border-radius: 4px 4px 0 0;">Queue</div>
+                <div class="tab" data-tab="stats" style="padding: 8px 15px; background: #e0e0e0; border: 1px solid #c3c4c7; border-bottom: none; cursor: pointer; border-radius: 4px 4px 0 0;">Stats</div>
+            </div>
+
+            <div id="browse-pane" class="tab-pane active-pane" style="flex: 1; display: flex; flex-direction: column;">
+                <div id="browseWorkspace" style="overflow-y:auto; flex:1; display:flex; flex-direction:column;">
+                    <div class="empty-msg" style="margin-top:60px; text-align: center;">
+                      No relational database element selected for inspection.<br />Select any row item from the left hierarchy node array to query its details.
+                    </div>
+                </div>
+            </div>
+
+            <div id="queue-pane" class="tab-pane" style="display: none; padding: 20px;">
+                <h2>Operations Queue</h2>
+                <div id="admin-queue-list">Loading queue...</div>
+            </div>
+
+            <div id="stats-pane" class="tab-pane" style="display: none; padding: 20px;">
+                <h2>System Statistics</h2>
+                <div id="admin-stats-content">Loading stats...</div>
+            </div>
+          </div>
+
+          <!-- Right Panel -->
+          <div class="right-properties" id="rightPanel">
+            <div id="rightPanelContent">
+                <div class="props-card"><div class="empty-msg">No node selected.</div></div>
+            </div>
+          </div>
+        </div>
+        <?php
+    }
 
 	public function settings_page_html() {
 		if ( ! current_user_can( 'manage_options' ) ) return;
@@ -180,6 +289,17 @@ class MusicMan {
 		</div>
 		<?php
 	}
+
+    public function load_templates( $template ) {
+        $post_type = get_post_type();
+        if ( in_array( $post_type, [ 'musicman_track', 'musicman_artist', 'musicman_collection' ] ) ) {
+            $plugin_template = MUSICMAN_DIR . 'templates/single-' . $post_type . '.php';
+            if ( file_exists( $plugin_template ) ) {
+                return $plugin_template;
+            }
+        }
+        return $template;
+    }
 
 	public function activate() {
 		global $wpdb;
