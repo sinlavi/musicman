@@ -23,9 +23,41 @@
         </div>
     </div>
     <div class="pma-header"><h3><i class="fas fa-boxes"></i> Albums</h3></div>
-    <div style="padding:0 10px 10px; overflow-y:auto; flex:1;">
-        <p class="empty-msg">Select an album from the left sidebar to view details.</p>
+    <div id="artist-albums-list" style="padding:10px;">
+        <div class="empty-msg"><i class="fas fa-spinner fa-pulse"></i> Loading albums...</div>
     </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const list = document.getElementById('artist-albums-list');
+            try {
+                const res = await apiCall('/lookup?id=<?php echo $itunes_id; ?>&entity=album');
+                if (res.results) {
+                    const albums = res.results.filter(r => r.wrapperType === 'collection');
+                    if (albums.length === 0) {
+                        list.innerHTML = '<p class="empty-msg">No albums found.</p>';
+                        return;
+                    }
+                    list.innerHTML = `
+                        <table class="data-table">
+                            <thead><tr><th>Album</th><th>Year</th><th>Tracks</th><th>Action</th></tr></thead>
+                            <tbody>
+                                ${albums.map(alb => `
+                                    <tr>
+                                        <td><a href="${alb.wp_permalink || '#'}">${alb.collectionName}</a></td>
+                                        <td>${alb.releaseDate ? new Date(alb.releaseDate).getFullYear() : 'N/A'}</td>
+                                        <td>${alb.trackCount}</td>
+                                        <td><button class="btn-sm btn-success" data-add-to-queue-album="${alb.collectionId}">Add All</button></td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                }
+            } catch (e) {
+                list.innerHTML = '<p class="empty-msg">Error loading albums.</p>';
+            }
+        });
+    </script>
     <?php endwhile; ?>
 </div>
 

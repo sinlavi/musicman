@@ -22,9 +22,49 @@
         </div>
     </div>
     <div class="pma-header"><h3><i class="fas fa-list-ol"></i> Tracks</h3></div>
-    <div style="padding:0 10px 10px; overflow-y:auto; flex:1;">
-        <p class="empty-msg">Select a track from the left sidebar to view details.</p>
+    <div id="album-tracks-list" style="padding:10px;">
+        <div class="empty-msg"><i class="fas fa-spinner fa-pulse"></i> Loading tracks...</div>
     </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const list = document.getElementById('album-tracks-list');
+            try {
+                const res = await apiCall('/lookup?id=<?php echo $itunes_id; ?>&entity=song');
+                if (res.results) {
+                    const tracks = res.results.filter(r => r.wrapperType === 'track' || r.kind === 'song');
+                    if (tracks.length === 0) {
+                        list.innerHTML = '<p class="empty-msg">No tracks found.</p>';
+                        return;
+                    }
+                    list.innerHTML = `
+                        <table class="data-table">
+                            <thead><tr><th>#</th><th>Track</th><th>Time</th><th>Action</th></tr></thead>
+                            <tbody>
+                                ${tracks.map(trk => `
+                                    <tr>
+                                        <td>${trk.trackNumber}</td>
+                                        <td><a href="${trk.wp_permalink || '#'}">${trk.trackName}</a></td>
+                                        <td>${Math.floor(trk.trackTimeMillis/60000)}:${str_pad(Math.floor((trk.trackTimeMillis%60000)/1000), 2, '0', 'STR_PAD_LEFT')}</td>
+                                        <td>
+                                            <button class="btn-sm btn-play" data-itunes-id="${trk.trackId}"><i class="fas fa-play"></i></button>
+                                            <button class="btn-sm btn-success" data-add-to-queue="${trk.trackId}"><i class="fas fa-download"></i></button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                }
+            } catch (e) {
+                list.innerHTML = '<p class="empty-msg">Error loading tracks.</p>';
+            }
+        });
+        function str_pad(n, width, z) {
+          z = z || '0';
+          n = n + '';
+          return n.length >= width ? n : new Array(width - n.length + 1).join(z) + n;
+        }
+    </script>
     <?php endwhile; ?>
 </div>
 

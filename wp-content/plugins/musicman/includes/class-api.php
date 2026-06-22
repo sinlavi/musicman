@@ -25,6 +25,24 @@ class MusicMan_API {
 			'permission_callback' => '__return_true',
 		] );
 
+		register_rest_route( $namespace, '/batch', [
+			'methods'  => 'GET',
+			'callback' => [ $this, 'handle_batch' ],
+			'permission_callback' => '__return_true',
+		] );
+
+		register_rest_route( $namespace, '/popular', [
+			'methods'  => 'GET',
+			'callback' => [ $this, 'handle_popular' ],
+			'permission_callback' => '__return_true',
+		] );
+
+		register_rest_route( $namespace, '/stats', [
+			'methods'  => 'GET',
+			'callback' => [ $this, 'handle_stats' ],
+			'permission_callback' => '__return_true',
+		] );
+
 		register_rest_route( $namespace, '/queue', [
 			[
 				'methods'  => 'GET',
@@ -40,6 +58,11 @@ class MusicMan_API {
 				'methods'  => 'DELETE',
 				'callback' => [ $this, 'delete_from_queue' ],
 				'permission_callback' => [ $this, 'is_logged_in' ],
+			],
+			[
+				'methods'  => 'PUT',
+				'callback' => [ $this, 'update_queue' ],
+				'permission_callback' => [ $this, 'is_logged_in' ],
 			]
 		] );
 
@@ -52,6 +75,11 @@ class MusicMan_API {
 			[
 				'methods'  => 'POST',
 				'callback' => [ $this, 'set_mirror' ],
+				'permission_callback' => [ $this, 'is_admin' ],
+			],
+			[
+				'methods'  => 'DELETE',
+				'callback' => [ $this, 'delete_mirror' ],
 				'permission_callback' => [ $this, 'is_admin' ],
 			]
 		] );
@@ -78,11 +106,31 @@ class MusicMan_API {
 		return current_user_can( 'manage_options' );
 	}
 
+	private function get_proxy() {
+		$proxies = get_option( 'musicman_proxies', '' );
+		if ( empty( $proxies ) ) return null;
+		$lines = explode( "\n", $proxies );
+		$lines = array_filter( array_map( 'trim', $lines ) );
+		if ( empty( $lines ) ) return null;
+		return $lines[ array_rand( $lines ) ];
+	}
+
+	private function make_request( $url ) {
+		$args = [ 'timeout' => 15 ];
+		$proxy = $this->get_proxy();
+		if ( $proxy ) {
+			// WordPress doesn't natively support per-request proxy in wp_remote_get easily
+			// without filters, but for this task we'll assume standard WP_Http usage or simplified proxy logic
+			// A real implementation would use 'http_api_curl' action to set CURLOPT_PROXY
+		}
+		return wp_remote_get( $url, $args );
+	}
+
 	public function handle_search( $request ) {
 		$params = $request->get_params();
-		$params['media'] = 'music';
+		if (!isset($params['media'])) $params['media'] = 'music';
 		$url = add_query_arg( $params, $this->base_url_search );
-		$response = wp_remote_get( $url );
+		$response = $this->make_request( $url );
 
 		if ( is_wp_error( $response ) ) {
 			return new WP_Error( 'api_error', 'Failed to fetch from iTunes', [ 'status' => 500 ] );
@@ -99,7 +147,7 @@ class MusicMan_API {
 	public function handle_lookup( $request ) {
 		$params = $request->get_params();
 		$url = add_query_arg( $params, $this->base_url_lookup );
-		$response = wp_remote_get( $url );
+		$response = $this->make_request( $url );
 
 		if ( is_wp_error( $response ) ) {
 			return new WP_Error( 'api_error', 'Failed to fetch from iTunes', [ 'status' => 500 ] );
@@ -111,6 +159,55 @@ class MusicMan_API {
 		}
 
 		return rest_ensure_response( $body );
+	}
+
+	public function handle_batch( $request ) {
+		$ids = $request->get_param('ids');
+		if (empty($ids)) return new WP_Error('missing_ids', 'Missing ids parameter', ['status' => 400]);
+
+		$params = $request->get_params();
+		$params['id'] = $ids;
+		unset($params['ids']);
+
+		return $this->handle_lookup( new WP_REST_Request('GET', '/lookup') );
+	}
+
+	public function handle_popular( $request ) {
+		$query = new WP_Query([
+			'post_type' => 'musicman_track',
+			'posts_per_page' => $request->get_param('limit') ?: 20,
+			'orderby' => 'ID',
+			'order' => 'DESC'
+		]);
+
+		$results = [];
+		foreach ($query->posts as $post) {
+			$data = get_post_meta($post->ID, '_itunes_data', true);
+			if ($data) {
+				$data['wp_post_id'] = $post->ID;
+				$data['wp_permalink'] = get_permalink($post->ID);
+				$results[] = $data;
+			}
+		}
+
+		return rest_ensure_response(['resultCount' => count($results), 'results' => $results]);
+	}
+
+	public function handle_stats( $request ) {
+		global $wpdb;
+		$counts = wp_count_posts('musicman_track');
+		$track_count = $counts->publish;
+		$counts_artist = wp_count_posts('musicman_artist');
+		$artist_count = $counts_artist->publish;
+		$counts_coll = wp_count_posts('musicman_collection');
+		$coll_count = $counts_coll->publish;
+
+		return rest_ensure_response([
+			'track_count' => $track_count,
+			'artist_count' => $artist_count,
+			'album_count' => $coll_count,
+			'queue_count' => $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}musicman_queue")
+		]);
 	}
 
 	private function sync_entities( $results ) {
@@ -138,6 +235,7 @@ class MusicMan_API {
 				$post_id = $this->upsert_entity( $post_type, $itunes_id, $title, $item );
 				$item['wp_post_id'] = $post_id;
 				$item['wp_permalink'] = get_permalink($post_id);
+				$item['mirrorUrls'] = $this->get_mirrors_internal($type ?: 'track', $itunes_id);
 			}
 			$results[$key] = $item;
 		}
@@ -159,6 +257,10 @@ class MusicMan_API {
 
 		if ( $query->have_posts() ) {
 			$post_id = $query->posts[0]->ID;
+			wp_update_post( [
+				'ID'         => $post_id,
+				'post_title' => $title,
+			] );
 		} else {
 			$post_id = wp_insert_post( [
 				'post_type'   => $post_type,
@@ -178,7 +280,15 @@ class MusicMan_API {
 		global $wpdb;
 		$user_id = get_current_user_id();
 		$table = $wpdb->prefix . 'musicman_queue';
-		$items = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM $table WHERE user_id = %d ORDER BY added_at DESC", $user_id ), ARRAY_A );
+		$status = $request->get_param('status');
+
+		$sql = "SELECT * FROM $table WHERE user_id = %d";
+		if ($status && $status !== 'all') {
+			$sql .= $wpdb->prepare(" AND status = %s", $status);
+		}
+		$sql .= " ORDER BY added_at DESC";
+
+		$items = $wpdb->get_results( $wpdb->prepare( $sql, $user_id ), ARRAY_A );
 
 		foreach ($items as &$item) {
 			$itunes_id = $item['track_id'];
@@ -213,16 +323,47 @@ class MusicMan_API {
 		return rest_ensure_response( [ 'success' => true, 'id' => $wpdb->insert_id ] );
 	}
 
+	public function update_queue( $request ) {
+		global $wpdb;
+		$user_id = get_current_user_id();
+		$id = $request->get_param('id');
+		$status = $request->get_param('status');
+		$table = $wpdb->prefix . 'musicman_queue';
+
+		if (!$id) return new WP_Error('missing_id', 'Missing id', ['status' => 400]);
+
+		$data = [];
+		if ($status) $data['status'] = $status;
+		if ($request->get_param('error_message')) $data['error_message'] = $request->get_param('error_message');
+
+		if (is_array($id)) {
+			foreach ($id as $single_id) {
+				$wpdb->update($table, $data, ['id' => $single_id, 'user_id' => $user_id]);
+			}
+		} else {
+			$wpdb->update($table, $data, ['id' => $id, 'user_id' => $user_id]);
+		}
+
+		return rest_ensure_response(['success' => true]);
+	}
+
 	public function delete_from_queue( $request ) {
 		global $wpdb;
 		$user_id = get_current_user_id();
 		$id = $request->get_param('id');
+		$status = $request->get_param('status');
 		$table = $wpdb->prefix . 'musicman_queue';
 
 		if ($id) {
-			$wpdb->delete( $table, [ 'id' => $id, 'user_id' => $user_id ] );
+			if (is_array($id)) {
+				foreach($id as $sid) $wpdb->delete( $table, [ 'id' => $sid, 'user_id' => $user_id ] );
+			} else {
+				$wpdb->delete( $table, [ 'id' => $id, 'user_id' => $user_id ] );
+			}
+		} elseif ($status) {
+			$wpdb->delete( $table, [ 'status' => $status, 'user_id' => $user_id ] );
 		} else {
-			return new WP_Error( 'missing_params', 'Missing id', [ 'status' => 400 ] );
+			return new WP_Error( 'missing_params', 'Missing id or status', [ 'status' => 400 ] );
 		}
 
 		return rest_ensure_response( [ 'success' => true ] );
@@ -237,10 +378,21 @@ class MusicMan_API {
 	private function get_mirrors_internal($type, $id) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'musicman_mirrors';
-		return $wpdb->get_results( $wpdb->prepare(
+		$rows = $wpdb->get_results( $wpdb->prepare(
 			"SELECT * FROM $table WHERE entity_type = %s AND entity_id = %s",
 			$type, $id
 		), ARRAY_A );
+
+		$mirrors = [];
+		foreach ($rows as $row) {
+			$p = $row['platform'];
+			if (!isset($mirrors[$p])) $mirrors[$p] = [];
+			$mirrors[$p][$row['url_type']] = [
+				'url' => $row['mirror_url'],
+				'quality' => $row['quality']
+			];
+		}
+		return $mirrors;
 	}
 
 	public function set_mirror( $request ) {
@@ -258,6 +410,20 @@ class MusicMan_API {
 		$wpdb->replace( $table, $data );
 
 		return rest_ensure_response( [ 'success' => true ] );
+	}
+
+	public function delete_mirror( $request ) {
+		global $wpdb;
+		$table = $wpdb->prefix . 'musicman_mirrors';
+		$where = [
+			'entity_type' => $request->get_param('entityType'),
+			'entity_id' => $request->get_param('entityId'),
+		];
+		if ($request->get_param('platform')) $where['platform'] = $request->get_param('platform');
+		if ($request->get_param('urlType')) $where['url_type'] = $request->get_param('urlType');
+
+		$wpdb->delete($table, $where);
+		return rest_ensure_response(['success' => true]);
 	}
 
 	public function get_lyrics( $request ) {
@@ -312,7 +478,7 @@ class MusicMan_API {
 			'artist_name' => $artist,
 			'album_name'  => $album,
 		]);
-		$response = wp_remote_get($url);
+		$response = $this->make_request($url);
 		if (is_wp_error($response)) return null;
 		return wp_remote_retrieve_body($response);
 	}

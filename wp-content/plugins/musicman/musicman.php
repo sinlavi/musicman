@@ -22,6 +22,7 @@ class MusicMan {
 
 	private function __construct() {
 		add_action( 'init', [ $this, 'register_post_types' ] );
+		add_action( 'admin_menu', [ $this, 'add_admin_menu' ] );
 		register_activation_hook( __FILE__, [ $this, 'activate' ] );
 		$this->includes();
 	}
@@ -52,6 +53,45 @@ class MusicMan {
 		}
 	}
 
+	public function add_admin_menu() {
+		add_options_page(
+			'MusicMan Settings',
+			'MusicMan',
+			'manage_options',
+			'musicman',
+			[ $this, 'settings_page_html' ]
+		);
+	}
+
+	public function settings_page_html() {
+		if ( ! current_user_can( 'manage_options' ) ) return;
+
+		if ( isset( $_POST['musicman_save_settings'] ) ) {
+			update_option( 'musicman_proxies', $_POST['musicman_proxies'] );
+			echo '<div class="updated"><p>Settings saved.</p></div>';
+		}
+
+		$proxies = get_option( 'musicman_proxies', '' );
+		?>
+		<div class="wrap">
+			<h1>MusicMan Settings</h1>
+			<form method="post">
+				<table class="form-table">
+					<tr>
+						<th scope="row">Proxies (one per line)</th>
+						<td>
+							<textarea name="musicman_proxies" rows="10" cols="50" class="large-text"><?php echo esc_textarea( $proxies ); ?></textarea>
+						</td>
+					</tr>
+				</table>
+				<p class="submit">
+					<input type="submit" name="musicman_save_settings" class="button button-primary" value="Save Settings">
+				</p>
+			</form>
+		</div>
+		<?php
+	}
+
 	public function activate() {
 		global $wpdb;
 		$charset_collate = $wpdb->get_charset_collate();
@@ -67,7 +107,7 @@ class MusicMan {
 			platform varchar(50) NOT NULL DEFAULT 'telegram',
 			updated_at datetime DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY  (id),
-			KEY entity_lookup (entity_type, entity_id)
+			UNIQUE KEY unique_mirror (entity_type, entity_id, url_type, quality, platform)
 		) $charset_collate;";
 
 		$table_queue = $wpdb->prefix . 'musicman_queue';

@@ -2,7 +2,9 @@
 
   <!-- Right Panel -->
   <div class="right-properties" id="rightPanel">
-    <div class="props-card"><div class="empty-msg"><i class="fas fa-info-circle"></i> No node selected.</div></div>
+    <div id="rightPanelContent">
+        <div class="props-card"><div class="empty-msg"><i class="fas fa-info-circle"></i> No node selected.</div></div>
+    </div>
   </div>
 </div><!-- .pmah-layout -->
 
