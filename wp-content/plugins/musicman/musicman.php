@@ -23,8 +23,39 @@ class MusicMan {
 	private function __construct() {
 		add_action( 'init', [ $this, 'register_post_types' ] );
 		add_action( 'admin_menu', [ $this, 'add_admin_menu' ] );
+		add_filter( 'manage_musicman_track_posts_columns', [ $this, 'track_columns' ] );
+		add_action( 'manage_musicman_track_posts_custom_column', [ $this, 'track_column_content' ], 10, 2 );
 		register_activation_hook( __FILE__, [ $this, 'activate' ] );
 		$this->includes();
+	}
+
+	public function track_columns( $columns ) {
+		$new = [];
+		foreach ( $columns as $key => $label ) {
+			$new[ $key ] = $label;
+			if ( 'title' === $key ) {
+				$new['itunes_id'] = 'iTunes ID';
+				$new['artwork']   = 'Artwork';
+				$new['views']     = 'Views';
+			}
+		}
+		return $new;
+	}
+
+	public function track_column_content( $column, $post_id ) {
+		switch ( $column ) {
+			case 'itunes_id':
+				echo esc_html( get_post_meta( $post_id, '_itunes_id', true ) );
+				break;
+			case 'artwork':
+				if ( has_post_thumbnail( $post_id ) ) {
+					the_post_thumbnail( [ 50, 50 ] );
+				}
+				break;
+			case 'views':
+				echo (int) get_post_meta( $post_id, '_mt_views', true );
+				break;
+		}
 	}
 
 	private function includes() {

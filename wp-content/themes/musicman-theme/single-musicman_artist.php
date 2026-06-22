@@ -5,20 +5,27 @@
         $itunes_data = get_post_meta( get_the_ID(), '_itunes_data', true );
         $itunes_id = get_post_meta( get_the_ID(), '_itunes_id', true );
         $artist_name = isset($itunes_data['artistName']) ? $itunes_data['artistName'] : get_the_title();
+        $views = (int)get_post_meta(get_the_ID(), '_mt_views', true);
     ?>
     <div class="pma-header">
         <h2><i class="fas fa-user"></i> <?php echo esc_html( $artist_name ); ?></h2>
-        <button class="btn-sm btn-success" style="margin-left:auto;"><i class="fas fa-download"></i> Add All</button>
+        <div style="margin-left:auto; display:flex; align-items:center; gap:10px;">
+            <span class="stat-item"><i class="fas fa-eye"></i> <?php echo $views; ?></span>
+            <button class="btn-sm btn-success" id="crawl-artist-btn"><i class="fas fa-sync"></i> Crawl Albums</button>
+        </div>
     </div>
     <div class="pma-doc-box" style="flex:1; overflow-y:auto;">
         <div class="profile-container">
-            <div style="text-align:center; background:#e1e1e1; padding:20px; border:1px solid #ccc; display:flex; align-items:center; justify-content:center; width:100%; max-width:100px;">
-                <i class="fas fa-user-tie fa-4x" style="color:#888;"></i>
+            <div style="text-align:center;">
+                <?php if (has_post_thumbnail()): the_post_thumbnail('medium', ['style' => 'width:120px; height:auto; border-radius:4px;']); else: ?>
+                    <div style="background:#e1e1e1; padding:20px; border:1px solid #ccc; border-radius:4px;"><i class="fas fa-user-tie fa-4x" style="color:#888;"></i></div>
+                <?php endif; ?>
             </div>
             <div class="profile-meta-grid">
-                <div class="meta-block"><label>ID</label><div><?php echo esc_html($itunes_id); ?></div></div>
+                <div class="meta-block"><label>iTunes ID</label><div><?php echo esc_html($itunes_id); ?></div></div>
                 <div class="meta-block"><label>Genre</label><div><?php echo esc_html($itunes_data['primaryGenreName'] ?? 'Unknown'); ?></div></div>
                 <div class="meta-block"><label>Country</label><div><?php echo esc_html($itunes_data['country'] ?? '—'); ?></div></div>
+                <div class="meta-block"><label>Link</label><div><a href="<?php echo esc_url($itunes_data['artistLinkUrl'] ?? '#'); ?>" target="_blank">View on iTunes</a></div></div>
             </div>
         </div>
     </div>
@@ -29,33 +36,53 @@
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
             const list = document.getElementById('artist-albums-list');
-            try {
-                const res = await apiCall('/lookup?id=<?php echo $itunes_id; ?>&entity=album');
-                if (res.results) {
-                    const albums = res.results.filter(r => r.wrapperType === 'collection');
-                    if (albums.length === 0) {
-                        list.innerHTML = '<p class="empty-msg">No albums found.</p>';
-                        return;
+            const crawlBtn = document.getElementById('crawl-artist-btn');
+
+            const loadAlbums = async () => {
+                try {
+                    const res = await apiCall('/lookup?id=<?php echo $itunes_id; ?>&entity=album');
+                    if (res.results) {
+                        const albums = res.results.filter(r => r.wrapperType === 'collection');
+                        if (albums.length === 0) {
+                            list.innerHTML = '<p class="empty-msg">No albums found.</p>';
+                            return;
+                        }
+                        list.innerHTML = `
+                            <table class="data-table">
+                                <thead><tr><th>Album</th><th>Year</th><th>Tracks</th><th>Action</th></tr></thead>
+                                <tbody>
+                                    ${albums.map(alb => `
+                                        <tr>
+                                            <td>
+                                                <div style="display:flex; align-items:center; gap:8px;">
+                                                    <img src="${alb.artworkUrl60}" style="width:30px; border-radius:2px;">
+                                                    <a href="${alb.wp_permalink || '#'}">${alb.collectionName}</a>
+                                                </div>
+                                            </td>
+                                            <td>${alb.releaseDate ? new Date(alb.releaseDate).getFullYear() : 'N/A'}</td>
+                                            <td>${alb.trackCount}</td>
+                                            <td><button class="btn-sm btn-success" data-add-to-queue-album="${alb.collectionId}"><i class="fas fa-download"></i> Add All</button></td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        `;
                     }
-                    list.innerHTML = `
-                        <table class="data-table">
-                            <thead><tr><th>Album</th><th>Year</th><th>Tracks</th><th>Action</th></tr></thead>
-                            <tbody>
-                                ${albums.map(alb => `
-                                    <tr>
-                                        <td><a href="${alb.wp_permalink || '#'}">${alb.collectionName}</a></td>
-                                        <td>${alb.releaseDate ? new Date(alb.releaseDate).getFullYear() : 'N/A'}</td>
-                                        <td>${alb.trackCount}</td>
-                                        <td><button class="btn-sm btn-success" data-add-to-queue-album="${alb.collectionId}">Add All</button></td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    `;
+                } catch (e) {
+                    list.innerHTML = '<p class="empty-msg">Error loading albums.</p>';
                 }
-            } catch (e) {
-                list.innerHTML = '<p class="empty-msg">Error loading albums.</p>';
-            }
+            };
+
+            crawlBtn.addEventListener('click', async () => {
+                crawlBtn.disabled = true;
+                crawlBtn.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> Crawling...';
+                await loadAlbums();
+                crawlBtn.disabled = false;
+                crawlBtn.innerHTML = '<i class="fas fa-sync"></i> Crawl Albums';
+                showToast('Artist crawl complete');
+            });
+
+            loadAlbums();
         });
     </script>
     <?php endwhile; ?>
