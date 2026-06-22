@@ -2,12 +2,13 @@
 
 <div id="browse-tab" class="tab-pane active-pane">
     <?php while ( have_posts() ) : the_post();
-        $itunes_data = get_post_meta( get_the_ID(), '_itunes_data', true );
-        $itunes_id = get_post_meta( get_the_ID(), '_itunes_id', true );
-        $lyrics = get_post_meta( get_the_ID(), '_lyrics', true );
-        $track_name = isset($itunes_data['trackName']) ? $itunes_data['trackName'] : get_the_title();
-        $artist_name = isset($itunes_data['artistName']) ? $itunes_data['artistName'] : 'Unknown Artist';
-        $artwork = isset($itunes_data['artworkUrl100']) ? $itunes_data['artworkUrl100'] : '';
+        $id = get_the_ID();
+        $itunes_id = get_post_meta( $id, 'trackId', true );
+        $track_name = get_post_meta($id, 'trackName', true) ?: get_the_title();
+        $artist_name = get_post_meta($id, 'artistName', true) ?: 'Unknown Artist';
+        $artwork = get_post_meta($id, 'artworkUrl100', true);
+        $duration_ms = get_post_meta($id, 'trackTimeMillis', true);
+        $collection_name = get_post_meta($id, 'collectionName', true) ?: 'Single';
     ?>
     <div class="pma-header">
         <h2><i class="fas fa-music"></i> <?php echo esc_html( $track_name ); ?></h2>
@@ -22,10 +23,9 @@
             <div class="profile-meta-grid">
                 <div class="meta-block"><label>ID</label><div><?php echo esc_html($itunes_id); ?></div></div>
                 <div class="meta-block"><label>Artist</label><div><?php echo esc_html($artist_name); ?></div></div>
-                <div class="meta-block"><label>Album</label><div><?php echo esc_html($itunes_data['collectionName'] ?? 'Single'); ?></div></div>
+                <div class="meta-block"><label>Album</label><div><?php echo esc_html($collection_name); ?></div></div>
                 <div class="meta-block"><label>Duration</label><div><?php
-                    $ms = $itunes_data['trackTimeMillis'] ?? 0;
-                    echo floor($ms/60000) . ':' . str_pad(floor(($ms%60000)/1000), 2, '0', STR_PAD_LEFT);
+                    echo floor($duration_ms/60000) . ':' . str_pad(floor(($duration_ms%60000)/1000), 2, '0', STR_PAD_LEFT);
                 ?></div></div>
                 <div class="meta-block" style="grid-column:1/-1;"><label>Mirrors</label><div id="mirrors-container"></div></div>
                 <div class="meta-block" style="grid-column:1/-1;"><label>Lyrics</label><div id="lyrics-container"></div></div>

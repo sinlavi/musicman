@@ -2,10 +2,13 @@
 
 <div id="browse-tab" class="tab-pane active-pane">
     <?php while ( have_posts() ) : the_post();
-        $itunes_data = get_post_meta( get_the_ID(), '_itunes_data', true );
-        $itunes_id = get_post_meta( get_the_ID(), '_itunes_id', true );
-        $artist_name = isset($itunes_data['artistName']) ? $itunes_data['artistName'] : get_the_title();
-        $views = (int)get_post_meta(get_the_ID(), '_mt_views', true);
+        $id = get_the_ID();
+        $itunes_id = get_post_meta( $id, 'artistId', true );
+        $artist_name = get_post_meta($id, 'artistName', true) ?: get_the_title();
+        $views = (int)get_post_meta($id, '_mt_views', true);
+        $genre = get_post_meta($id, 'primaryGenreName', true);
+        $country = get_post_meta($id, 'country', true);
+        $link = get_post_meta($id, 'artistViewUrl', true);
     ?>
     <div class="pma-header">
         <h2><i class="fas fa-user"></i> <?php echo esc_html( $artist_name ); ?></h2>
@@ -23,9 +26,9 @@
             </div>
             <div class="profile-meta-grid">
                 <div class="meta-block"><label>iTunes ID</label><div><?php echo esc_html($itunes_id); ?></div></div>
-                <div class="meta-block"><label>Genre</label><div><?php echo esc_html($itunes_data['primaryGenreName'] ?? 'Unknown'); ?></div></div>
-                <div class="meta-block"><label>Country</label><div><?php echo esc_html($itunes_data['country'] ?? '—'); ?></div></div>
-                <div class="meta-block"><label>Link</label><div><a href="<?php echo esc_url($itunes_data['artistLinkUrl'] ?? '#'); ?>" target="_blank">View on iTunes</a></div></div>
+                <div class="meta-block"><label>Genre</label><div><?php echo esc_html($genre ?? 'Unknown'); ?></div></div>
+                <div class="meta-block"><label>Country</label><div><?php echo esc_html($country ?? '—'); ?></div></div>
+                <div class="meta-block"><label>Link</label><div><a href="<?php echo esc_url($link ?? '#'); ?>" target="_blank">View on iTunes</a></div></div>
             </div>
         </div>
     </div>

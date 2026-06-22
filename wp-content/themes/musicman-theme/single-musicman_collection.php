@@ -2,11 +2,15 @@
 
 <div id="browse-tab" class="tab-pane active-pane">
     <?php while ( have_posts() ) : the_post();
-        $itunes_data = get_post_meta( get_the_ID(), '_itunes_data', true );
-        $itunes_id = get_post_meta( get_the_ID(), '_itunes_id', true );
-        $collection_name = isset($itunes_data['collectionName']) ? $itunes_data['collectionName'] : get_the_title();
-        $artwork = isset($itunes_data['artworkUrl100']) ? $itunes_data['artworkUrl100'] : '';
-        $views = (int)get_post_meta(get_the_ID(), '_mt_views', true);
+        $id = get_the_ID();
+        $itunes_id = get_post_meta( $id, 'collectionId', true );
+        $collection_name = get_post_meta($id, 'collectionName', true) ?: get_the_title();
+        $artwork = get_post_meta($id, 'artworkUrl100', true);
+        $views = (int)get_post_meta($id, '_mt_views', true);
+        $artist_id = get_post_meta($id, 'artistId', true);
+        $artist_name = get_post_meta($id, 'artistName', true);
+        $track_count = get_post_meta($id, 'trackCount', true);
+        $release_date = get_post_meta($id, 'releaseDate', true);
     ?>
     <div class="pma-header">
         <h2><i class="fas fa-dot-circle"></i> <?php echo esc_html( $collection_name ); ?></h2>
@@ -26,12 +30,11 @@
             <div class="profile-meta-grid">
                 <div class="meta-block"><label>iTunes ID</label><div><?php echo esc_html($itunes_id); ?></div></div>
                 <div class="meta-block"><label>Artist</label><div><a href="<?php
-                    $artist_id = $itunes_data['artistId'] ?? '';
-                    $artist_post = MusicMan_API::get_post_by_itunes_id('musicman_artist', $artist_id);
+                    $artist_post = MusicMan_API::get_post_by_itunes_id('musicman_artist', 'artistId', $artist_id);
                     echo $artist_post ? get_permalink($artist_post->ID) : '#';
-                ?>"><?php echo esc_html($itunes_data['artistName'] ?? 'Unknown'); ?></a></div></div>
-                <div class="meta-block"><label>Tracks</label><div><?php echo esc_html($itunes_data['trackCount'] ?? 0); ?></div></div>
-                <div class="meta-block"><label>Release</label><div><?php echo date('Y-m-d', strtotime($itunes_data['releaseDate'] ?? 'now')); ?></div></div>
+                ?>"><?php echo esc_html($artist_name ?? 'Unknown'); ?></a></div></div>
+                <div class="meta-block"><label>Tracks</label><div><?php echo esc_html($track_count ?? 0); ?></div></div>
+                <div class="meta-block"><label>Release</label><div><?php echo date('Y-m-d', strtotime($release_date ?? 'now')); ?></div></div>
             </div>
         </div>
     </div>
