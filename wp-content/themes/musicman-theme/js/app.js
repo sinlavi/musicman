@@ -8,17 +8,13 @@ document.addEventListener('DOMContentLoaded', () => {
     initSearch();
     if (document.getElementById('queueBody')) {
         loadQueue();
-        setInterval(loadQueue, 5000);
+        setInterval(loadQueue, 15000);
+        initQueueControls();
     }
     initAudioPlayer();
     initMobileControls();
     initActionButtons();
     initBulkControls();
-
-    // If on a single page, load metadata into right panel
-    if (document.body.classList.contains('single')) {
-        // We can extract ID from body classes or global var if needed
-    }
 });
 
 async function apiCall(endpoint, method = 'GET', body = null) {
@@ -167,7 +163,7 @@ function getIcon(type) {
     }
 }
 
-function updateRightPanel(item) {
+async function updateRightPanel(item) {
     const container = document.getElementById('rightPanelContent');
     const type = item.wrapperType || (item.kind === 'song' ? 'track' : (item.kind === 'music-artist' ? 'artist' : ''));
     const id = item.trackId || item.collectionId || item.artistId;
@@ -192,13 +188,50 @@ function updateRightPanel(item) {
             <button class="btn btn-success" style="width:100%; margin-top:5px;" data-add-to-queue="${id}">
                 <i class="fas fa-download"></i> Add to Queue
             </button>
+            <hr>
+            <div id="props-mirrors">Loading mirrors...</div>
+            <hr>
+            <div id="props-lyrics">Loading lyrics...</div>
         `;
+
+        // Load extra data asynchronously
+        setTimeout(async () => {
+            const mirrorsCont = document.getElementById('props-mirrors');
+            const lyricsCont = document.getElementById('props-lyrics');
+
+            try {
+                const res = await apiCall(`/mirrors?entityType=track&entityId=${id}`);
+                if (res.success && res.mirrors) {
+                    let mHtml = '<strong>Mirrors</strong><div class="mirror-box">';
+                    for (const [plat, mirrors] of Object.entries(res.mirrors)) {
+                        mHtml += `<div class="mirror-item"><span class="mirror-platform">${plat}</span>`;
+                        for (const [mType, mData] of Object.entries(mirrors)) {
+                            mHtml += `<a href="${mData.url}" target="_blank" class="mirror-link">${mType}</a>`;
+                        }
+                        mHtml += '</div>';
+                    }
+                    mHtml += '</div>';
+                    if (mirrorsCont) mirrorsCont.innerHTML = mHtml;
+                } else if (mirrorsCont) mirrorsCont.innerHTML = 'No mirrors found.';
+
+                const lyRes = await apiCall(`/lyrics?id=${id}`);
+                if (lyRes.success && lyRes.lyrics) {
+                    const lyrics = JSON.parse(lyRes.lyrics);
+                    if (lyricsCont) lyricsCont.innerHTML = `<strong>Lyrics</strong><div class="lyrics-box">${lyrics.plainLyrics || lyrics.syncedLyrics || 'No text found.'}</div>`;
+                } else if (lyricsCont) lyricsCont.innerHTML = 'Lyrics not found.';
+            } catch (e) {
+                if (mirrorsCont) mirrorsCont.innerHTML = '';
+                if (lyricsCont) lyricsCont.innerHTML = '';
+            }
+        }, 100);
     }
 
     html += `</div>`;
     container.innerHTML = html;
     document.getElementById('rightPanel').classList.add('open-drawer');
 }
+
+let currentQueueItems = [];
 
 async function loadQueue() {
     const tbody = document.getElementById('queueBody');
@@ -207,41 +240,146 @@ async function loadQueue() {
     try {
         const data = await apiCall(`/queue?status=${filter}`);
         if (data.items) {
-            renderQueueTable(data.items);
-            updateQueueStats(data.items);
+            currentQueueItems = data.items;
+            filterQueueItems();
         }
     } catch (e) {}
+}
+
+function filterQueueItems() {
+    const searchTerm = document.getElementById('queueSearchFilter').value.toLowerCase();
+    const sortBy = document.getElementById('queueSortBy').value;
+
+    let filtered = currentQueueItems.filter(item => {
+        const name = (item.track_data ? item.track_data.trackName : item.track_id).toLowerCase();
+        return name.includes(searchTerm);
+    });
+
+    filtered.sort((a, b) => {
+        if (sortBy === 'track') {
+            const nameA = (a.track_data ? a.track_data.trackName : a.track_id).toLowerCase();
+            const nameB = (b.track_data ? b.track_data.trackName : b.track_id).toLowerCase();
+            return nameA.localeCompare(nameB);
+        } else if (sortBy === 'status') {
+            return a.status.localeCompare(b.status);
+        } else if (sortBy === 'added') {
+            return new Date(b.added_at) - new Date(a.added_at);
+        }
+        return a.id - b.id;
+    });
+
+    renderQueueTable(filtered);
+    updateQueueStats(currentQueueItems);
+    document.getElementById('queueFilterCount').textContent = `Showing: ${filtered.length}`;
 }
 
 function renderQueueTable(items) {
     const tbody = document.getElementById('queueBody');
     if (items.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="empty-msg">No items in queue.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-msg">No items in queue.</td></tr>';
         return;
     }
     tbody.innerHTML = items.map(item => {
         const name = item.track_data ? item.track_data.trackName : item.track_id;
         return `
         <tr>
+            <td class="checkbox-col"><input type="checkbox" class="queue-checkbox" value="${item.id}"></td>
             <td>${item.id}</td>
             <td><strong>${name}</strong></td>
             <td>${item.quality}</td>
             <td><span class="status-badge status-${item.status}">${item.status}</span></td>
             <td>
                 <button class="btn-sm btn-danger" onclick="deleteQueueItem(${item.id})"><i class="fas fa-trash"></i></button>
-                ${item.status === 'failed' ? `<button class="btn-sm btn-warning" onclick="updateQueueStatus(${item.id}, 'pending')"><i class="fas fa-redo"></i></button>` : ''}
+                ${(item.status === 'failed' || item.status === 'stopped') ? `<button class="btn-sm btn-warning" onclick="updateQueueStatus(${item.id}, 'pending')"><i class="fas fa-redo"></i></button>` : ''}
             </td>
+            <td>${item.error_message || '—'}</td>
         </tr>
     `}).join('');
+
+    document.querySelectorAll('.queue-checkbox').forEach(cb => {
+        cb.addEventListener('change', updateQueueBulkBar);
+    });
 }
 
 function updateQueueStats(items) {
-    const stats = { pending: 0, downloading: 0, completed: 0 };
+    const stats = { pending: 0, downloading: 0, paused: 0, completed: 0, failed: 0 };
     items.forEach(i => { if (stats[i.status] !== undefined) stats[i.status]++; });
     document.getElementById('statPending').textContent = stats.pending;
     document.getElementById('statDownloading').textContent = stats.downloading;
+    document.getElementById('statPaused').textContent = stats.paused;
     document.getElementById('statCompleted').textContent = stats.completed;
+    document.getElementById('statFailed').textContent = stats.failed;
     document.getElementById('queueStats').textContent = `${items.length} total`;
+}
+
+function initQueueControls() {
+    document.getElementById('queueStatusFilter').addEventListener('change', loadQueue);
+    document.getElementById('queueSearchFilter').addEventListener('input', filterQueueItems);
+    document.getElementById('queueSortBy').addEventListener('change', filterQueueItems);
+    document.getElementById('refreshQueueBtn').addEventListener('click', loadQueue);
+    document.getElementById('clearQueueFilters').addEventListener('click', () => {
+        document.getElementById('queueStatusFilter').value = 'all';
+        document.getElementById('queueSearchFilter').value = '';
+        document.getElementById('queueSortBy').value = 'added';
+        loadQueue();
+    });
+
+    document.getElementById('queueSelectAll').addEventListener('change', (e) => {
+        document.querySelectorAll('.queue-checkbox').forEach(cb => cb.checked = e.target.checked);
+        updateQueueBulkBar();
+    });
+
+    document.getElementById('queueSelectAllBtn').addEventListener('click', () => {
+        document.querySelectorAll('.queue-checkbox').forEach(cb => cb.checked = true);
+        updateQueueBulkBar();
+    });
+
+    document.getElementById('queueSelectNoneBtn').addEventListener('click', () => {
+        document.querySelectorAll('.queue-checkbox').forEach(cb => cb.checked = false);
+        updateQueueBulkBar();
+    });
+
+    document.getElementById('clearFailedBtn').addEventListener('click', async () => {
+        if (confirm('Clear all failed tasks?')) {
+            await apiCall('/queue?status=failed', 'DELETE');
+            loadQueue();
+        }
+    });
+
+    document.getElementById('retryFailedBtn').addEventListener('click', async () => {
+        const failed = currentQueueItems.filter(i => i.status === 'failed');
+        for (const item of failed) {
+            await apiCall(`/queue?id=${item.id}&status=pending`, 'PUT');
+        }
+        loadQueue();
+    });
+
+    // Bulk actions
+    document.getElementById('queueBulkDeleteBtn').addEventListener('click', async () => {
+        const ids = Array.from(document.querySelectorAll('.queue-checkbox:checked')).map(cb => cb.value);
+        if (ids.length > 0 && confirm(`Delete ${ids.length} selected items?`)) {
+            await apiCall('/queue', 'DELETE', { id: ids });
+            loadQueue();
+        }
+    });
+
+    document.getElementById('queueBulkStartBtn').addEventListener('click', () => bulkUpdateQueueStatus('downloading'));
+    document.getElementById('queueBulkPauseBtn').addEventListener('click', () => bulkUpdateQueueStatus('paused'));
+    document.getElementById('queueBulkStopBtn').addEventListener('click', () => bulkUpdateQueueStatus('stopped'));
+}
+
+async function bulkUpdateQueueStatus(status) {
+    const ids = Array.from(document.querySelectorAll('.queue-checkbox:checked')).map(cb => cb.value);
+    if (ids.length > 0) {
+        await apiCall('/queue', 'PUT', { id: ids, status: status });
+        loadQueue();
+    }
+}
+
+function updateQueueBulkBar() {
+    const count = document.querySelectorAll('.queue-checkbox:checked').length;
+    document.getElementById('queueSelectedCount').textContent = count;
+    document.getElementById('queueBulkBar').style.display = count > 0 ? 'flex' : 'none';
 }
 
 window.deleteQueueItem = async (id) => {
@@ -278,7 +416,7 @@ function initBulkControls() {
 
     if (bulkAddBtn) {
         bulkAddBtn.addEventListener('click', async () => {
-            const selected = document.querySelectorAll('.tree-checkbox:checked');
+            const selected = Array.from(document.querySelectorAll('.tree-checkbox:checked'));
             if (selected.length === 0) return;
 
             bulkAddBtn.disabled = true;
@@ -290,7 +428,6 @@ function initBulkControls() {
                 if (type === 'track') {
                     await apiCall('/queue', 'POST', { trackId: id });
                 } else if (type === 'collection') {
-                    // Fetch tracks and add them
                     const res = await apiCall(`/lookup?id=${id}&entity=song`);
                     if (res.results) {
                         const tracks = res.results.filter(r => r.wrapperType === 'track');
@@ -304,13 +441,15 @@ function initBulkControls() {
             showToast(`Added ${selected.length} items to queue`);
             bulkAddBtn.disabled = false;
             bulkAddBtn.innerHTML = '<i class="fas fa-plus"></i> Import';
+            loadQueue();
         });
     }
 }
 
 function updateBulkCount() {
     const count = document.querySelectorAll('.tree-checkbox:checked').length;
-    document.getElementById('treeSelectedCount').textContent = count;
+    const badge = document.getElementById('treeSelectedCount');
+    if (badge) badge.textContent = count;
 }
 
 let audioPlayer = null;
@@ -399,34 +538,13 @@ function initActionButtons() {
             const trackId = addBtn.getAttribute('data-add-to-queue');
             try {
                 const res = await apiCall('/queue', 'POST', { trackId });
-                if (res.success) showToast('Added to queue');
+                if (res.success) {
+                    showToast('Added to queue');
+                    loadQueue();
+                }
                 else showToast('Error adding to queue', true);
             } catch (err) {
                 showToast('Error adding to queue', true);
-            }
-        }
-
-        const addAlbumBtn = e.target.closest('[data-add-to-queue-album]');
-        if (addAlbumBtn) {
-            const id = addAlbumBtn.getAttribute('data-add-to-queue-album');
-            const res = await apiCall(`/lookup?id=${id}&entity=song`);
-            if (res.results) {
-                const tracks = res.results.filter(r => r.wrapperType === 'track');
-                for (const trk of tracks) {
-                    await apiCall('/queue', 'POST', { trackId: trk.trackId });
-                }
-                showToast(`Added ${tracks.length} tracks to queue`);
-            }
-        }
-
-        const playBtn = e.target.closest('.btn-play[data-itunes-id]');
-        if (playBtn) {
-            const itunesId = playBtn.getAttribute('data-itunes-id');
-            const res = await apiCall(`/lookup?id=${itunesId}`);
-            if (res.results && res.results[0]) {
-                const item = res.results[0];
-                const audioUrl = item.previewUrl;
-                playTrack(audioUrl, item.trackName, item.artistName, item.artworkUrl100);
             }
         }
     });

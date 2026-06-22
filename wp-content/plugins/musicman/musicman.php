@@ -2,13 +2,17 @@
 /**
  * Plugin Name: MusicMan
  * Description: Multi-User iTunes API Proxy & Download Manager for WordPress.
- * Version: 1.0.0
+ * Version: 1.8.0
  * Author: Jules
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
+
+define( 'MUSICMAN_VERSION', '1.8.0' );
+define( 'MUSICMAN_DIR', plugin_dir_path( __FILE__ ) );
+define( 'MUSICMAN_URL', plugin_dir_url( __FILE__ ) );
 
 class MusicMan {
 	private static $instance = null;
@@ -21,77 +25,131 @@ class MusicMan {
 	}
 
 	private function __construct() {
-		add_action( 'init', [ $this, 'register_post_types' ] );
-		add_action( 'admin_menu', [ $this, 'add_admin_menu' ] );
-		add_filter( 'manage_musicman_track_posts_columns', [ $this, 'track_columns' ] );
-		add_action( 'manage_musicman_track_posts_custom_column', [ $this, 'track_column_content' ], 10, 2 );
-		register_activation_hook( __FILE__, [ $this, 'activate' ] );
 		$this->includes();
-	}
+		add_action( 'admin_menu', [ $this, 'add_admin_menu' ] );
+		register_activation_hook( __FILE__, [ $this, 'activate' ] );
 
-	public function track_columns( $columns ) {
-		$new = [];
-		foreach ( $columns as $key => $label ) {
-			$new[ $key ] = $label;
-			if ( 'title' === $key ) {
-				$new['itunes_id'] = 'iTunes ID';
-				$new['artwork']   = 'Artwork';
-				$new['views']     = 'Views';
-			}
-		}
-		return $new;
-	}
-
-	public function track_column_content( $column, $post_id ) {
-		switch ( $column ) {
-			case 'itunes_id':
-				echo esc_html( get_post_meta( $post_id, '_itunes_id', true ) );
-				break;
-			case 'artwork':
-				if ( has_post_thumbnail( $post_id ) ) {
-					the_post_thumbnail( [ 50, 50 ] );
-				}
-				break;
-			case 'views':
-				echo (int) get_post_meta( $post_id, '_mt_views', true );
-				break;
-		}
+		add_action( 'plugins_loaded', [ $this, 'init_components' ] );
 	}
 
 	private function includes() {
-		require_once plugin_dir_path( __FILE__ ) . 'includes/class-api.php';
+		require_once MUSICMAN_DIR . 'includes/class-api.php';
+		require_once MUSICMAN_DIR . 'includes/class-musicman-base.php';
+		require_once MUSICMAN_DIR . 'includes/class-musicman-track.php';
+		require_once MUSICMAN_DIR . 'includes/class-musicman-artist.php';
+		require_once MUSICMAN_DIR . 'includes/class-musicman-collection.php';
 	}
 
-	public function register_post_types() {
-		$types = [
-			'musicman_artist'     => [ 'label' => 'Artists', 'singular' => 'Artist' ],
-			'musicman_collection' => [ 'label' => 'Collections', 'singular' => 'Collection' ],
-			'musicman_track'      => [ 'label' => 'Tracks', 'singular' => 'Track' ],
-		];
-
-		foreach ( $types as $type => $info ) {
-			register_post_type( $type, [
-				'labels'      => [
-					'name'          => $info['label'],
-					'singular_name' => $info['singular'],
-				],
-				'public'      => true,
-				'has_archive' => true,
-				'show_in_rest' => true,
-				'supports'    => [ 'title', 'editor', 'thumbnail', 'custom-fields' ],
-				'menu_icon'   => 'dashicons-format-audio',
-			] );
-		}
+	public function init_components() {
+		new MusicMan_Track();
+		new MusicMan_Artist();
+		new MusicMan_Collection();
 	}
 
 	public function add_admin_menu() {
-		add_options_page(
-			'MusicMan Settings',
+		add_menu_page(
+			'MusicMan',
 			'MusicMan',
 			'manage_options',
 			'musicman',
+			[ $this, 'dashboard_page_html' ],
+			'dashicons-format-audio'
+		);
+
+		add_submenu_page(
+			'musicman',
+			'Settings',
+			'Settings',
+			'manage_options',
+			'musicman-settings',
 			[ $this, 'settings_page_html' ]
 		);
+	}
+
+	public function dashboard_page_html() {
+		if ( ! current_user_can( 'manage_options' ) ) return;
+        global $wpdb;
+
+        $stats = [
+            'tracks' => wp_count_posts('musicman_track')->publish,
+            'artists' => wp_count_posts('musicman_artist')->publish,
+            'albums' => wp_count_posts('musicman_collection')->publish,
+            'queue' => $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}musicman_queue"),
+            'mirrors' => $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}musicman_mirrors")
+        ];
+		?>
+		<div class="wrap">
+			<h1>MusicMan Dashboard</h1>
+
+            <div class="welcome-panel" style="padding: 20px;">
+                <div class="welcome-panel-column-container">
+                    <div class="welcome-panel-column">
+                        <h3>System Stats</h3>
+                        <ul>
+                            <li><span class="dashicons dashicons-format-audio"></span> <strong><?php echo $stats['tracks']; ?></strong> Tracks</li>
+                            <li><span class="dashicons dashicons-admin-users"></span> <strong><?php echo $stats['artists']; ?></strong> Artists</li>
+                            <li><span class="dashicons dashicons-album"></span> <strong><?php echo $stats['albums']; ?></strong> Albums</li>
+                        </ul>
+                    </div>
+                    <div class="welcome-panel-column">
+                        <h3>Active Operations</h3>
+                        <ul>
+                            <li><span class="dashicons dashicons-download"></span> <strong><?php echo $stats['queue']; ?></strong> Items in Queue</li>
+                            <li><span class="dashicons dashicons-admin-links"></span> <strong><?php echo $stats['mirrors']; ?></strong> Mirror Links</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <h2 style="margin-top: 20px;">Recent Queue Activity</h2>
+            <table class="wp-list-table widefat fixed striped">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Track ID</th>
+                        <th>User</th>
+                        <th>Status</th>
+                        <th>Quality</th>
+                        <th>Added At</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php
+                    $queue_items = $wpdb->get_results("SELECT * FROM {$wpdb->prefix}musicman_queue ORDER BY added_at DESC LIMIT 10");
+                    if ($queue_items) {
+                        foreach ($queue_items as $item) {
+                            $user = get_userdata($item->user_id);
+                            echo "<tr>
+                                <td>{$item->id}</td>
+                                <td>{$item->track_id}</td>
+                                <td>" . ($user ? $user->display_name : 'Unknown') . "</td>
+                                <td><span class='status-badge status-{$item->status}'>{$item->status}</span></td>
+                                <td>{$item->quality}</td>
+                                <td>{$item->added_at}</td>
+                            </tr>";
+                        }
+                    } else {
+                        echo "<tr><td colspan='6'>No active queue items found.</td></tr>";
+                    }
+                    ?>
+                </tbody>
+            </table>
+
+            <style>
+                .status-badge {
+                    padding: 2px 8px;
+                    border-radius: 4px;
+                    font-size: 11px;
+                    font-weight: bold;
+                    text-transform: uppercase;
+                }
+                .status-pending { background: #fff3cd; color: #856404; }
+                .status-downloading { background: #cce5ff; color: #004085; }
+                .status-completed { background: #d4edda; color: #155724; }
+                .status-failed { background: #f8d7da; color: #721c24; }
+            </style>
+		</div>
+		<?php
 	}
 
 	public function settings_page_html() {
