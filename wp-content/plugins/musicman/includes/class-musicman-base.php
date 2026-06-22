@@ -73,7 +73,7 @@ abstract class MusicMan_Base
     /**
      * Create or update a post by a unique meta value.
      */
-    protected function create_or_update_post($post_type, $data, $meta_mapping, $unique_key)
+    public function create_or_update_post($post_type, $data, $meta_mapping, $unique_key)
     {
         $unique_value = $data[$unique_key] ?? '';
         if (empty($unique_value)) {

@@ -203,7 +203,7 @@ jQuery(document).ready(function($) {
                 <div class="props-row"><span>Type</span><strong>${type.toUpperCase()}</strong></div>
                 <div class="props-row"><span>ID</span><strong>${id}</strong></div>
                 <button class="button button-primary" style="width:100%; margin-top:10px;" id="props-add-to-queue">
-                    Add to Queue
+                    Add to Download Queue
                 </button>
             </div>
         `;

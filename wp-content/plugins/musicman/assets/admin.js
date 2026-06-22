@@ -10,7 +10,7 @@ jQuery(document).ready(function($) {
     }
 
     // ------------------ TRACK ADMIN ------------------
-    if (mt_admin.post_type === 'music_track') {
+    if (mt_admin.post_type === 'musicman_track') {
         var $searchInput   = $('#mt-search-input');
         var $searchBtn     = $('#mt-search-btn');
         var $results       = $('#mt-search-results');
@@ -21,18 +21,18 @@ jQuery(document).ready(function($) {
         $searchBtn.on('click', function() {
             var term = $searchInput.val().trim();
             if (!term) return;
-            $spinner.show();
+            $spinner.addClass('is-active').show();
             $results.hide().empty();
             $.post(mt_admin.ajaxurl, {
                 action: 'mt_search_itunes_track',
                 term: term,
                 nonce: mt_admin.nonce
             }, function(resp) {
-                $spinner.hide();
+                $spinner.removeClass('is-active').hide();
                 if (resp && resp !== '0') {
                     $results.html(resp).show();
                 } else {
-                    $results.html('<p>No results.</p>').show();
+                    $results.html('<p style="padding:10px;">No results.</p>').show();
                 }
             });
         });
@@ -44,6 +44,10 @@ jQuery(document).ready(function($) {
                 var $field = $('input[name="mt_' + key + '"], textarea[name="mt_' + key + '"]');
                 if ($field.length) $field.val(typeof value === 'object' ? JSON.stringify(value, null, 2) : value);
             });
+            if (track.trackName && track.artistName) {
+                $('#title').val(track.trackName + ' – ' + track.artistName);
+                $('#title-prompt-text').addClass('screen-reader-text');
+            }
             $results.hide();
         });
 
@@ -82,7 +86,6 @@ jQuery(document).ready(function($) {
             });
         });
 
-        // Import button (manual only)
         $('#mt-trigger-import').on('click', function() {
             if ($(this).prop('disabled')) return;
             showModal('Creating artist & album…');
@@ -95,7 +98,6 @@ jQuery(document).ready(function($) {
                 if (response.success) {
                     $('#mt-import-status').text('Imported');
                     $('#mt-trigger-import').text('Re‑import Artist & Album');
-                    $('#mt-trigger-import').prop('disabled', false);
                 } else {
                     alert('Import failed.');
                 }
@@ -104,7 +106,7 @@ jQuery(document).ready(function($) {
     }
 
     // ------------------ ARTIST ADMIN ------------------
-    if (mt_admin.post_type === 'music_artist') {
+    if (mt_admin.post_type === 'musicman_artist') {
         var $artSearchInput = $('#mt-artist-search-input');
         var $artSearchBtn   = $('#mt-artist-search-btn');
         var $artResults     = $('#mt-artist-results');
@@ -113,18 +115,18 @@ jQuery(document).ready(function($) {
         $artSearchBtn.on('click', function() {
             var term = $artSearchInput.val().trim();
             if (!term) return;
-            $artSpinner.show();
+            $artSpinner.addClass('is-active').show();
             $artResults.hide().empty();
             $.post(mt_admin.ajaxurl, {
                 action: 'mt_search_itunes_artist',
                 term: term,
                 nonce: mt_admin.nonce
             }, function(resp) {
-                $artSpinner.hide();
+                $artSpinner.removeClass('is-active').hide();
                 if (resp && resp !== '0') {
                     $artResults.html(resp).show();
                 } else {
-                    $artResults.html('<p>No results.</p>').show();
+                    $artResults.html('<p style="padding:10px;">No results.</p>').show();
                 }
             });
         });
@@ -136,13 +138,15 @@ jQuery(document).ready(function($) {
                 var $field = $('input[name="mt_' + key + '"]');
                 if ($field.length) $field.val(value);
             });
-            if (artist.artistName) $('#title').val(artist.artistName);
+            if (artist.artistName) {
+                $('#title').val(artist.artistName);
+                $('#title-prompt-text').addClass('screen-reader-text');
+            }
             $artResults.hide();
         });
 
         $artSearchInput.on('keypress', function(e) { if (e.which === 13) $artSearchBtn.click(); });
 
-        // Import button (manual only)
         $('#mt-trigger-import').on('click', function() {
             if ($(this).prop('disabled')) return;
             showModal('Importing full discography…');
@@ -155,7 +159,6 @@ jQuery(document).ready(function($) {
                 if (response.success) {
                     $('#mt-import-status').text('Imported');
                     $('#mt-trigger-import').text('Re‑import Discography');
-                    $('#mt-trigger-import').prop('disabled', false);
                 } else {
                     alert('Import failed.');
                 }
@@ -164,7 +167,7 @@ jQuery(document).ready(function($) {
     }
 
     // ------------------ COLLECTION ADMIN ------------------
-    if (mt_admin.post_type === 'music_collection') {
+    if (mt_admin.post_type === 'musicman_collection') {
         var $collSearchInput = $('#mt-album-search-input');
         var $collSearchBtn   = $('#mt-album-search-btn');
         var $collResults     = $('#mt-album-results');
@@ -173,18 +176,18 @@ jQuery(document).ready(function($) {
         $collSearchBtn.on('click', function() {
             var term = $collSearchInput.val().trim();
             if (!term) return;
-            $collSpinner.show();
+            $collSpinner.addClass('is-active').show();
             $collResults.hide().empty();
             $.post(mt_admin.ajaxurl, {
                 action: 'mt_search_itunes_album',
                 term: term,
                 nonce: mt_admin.nonce
             }, function(resp) {
-                $collSpinner.hide();
+                $collSpinner.removeClass('is-active').hide();
                 if (resp && resp !== '0') {
                     $collResults.html(resp).show();
                 } else {
-                    $collResults.html('<p>No results.</p>').show();
+                    $collResults.html('<p style="padding:10px;">No results.</p>').show();
                 }
             });
         });
@@ -196,13 +199,15 @@ jQuery(document).ready(function($) {
                 var $field = $('input[name="mt_' + key + '"]');
                 if ($field.length) $field.val(value);
             });
-            if (album.collectionName) $('#title').val(album.collectionName);
+            if (album.collectionName) {
+                $('#title').val(album.collectionName);
+                $('#title-prompt-text').addClass('screen-reader-text');
+            }
             $collResults.hide();
         });
 
         $collSearchInput.on('keypress', function(e) { if (e.which === 13) $collSearchBtn.click(); });
 
-        // Import button (manual only)
         $('#mt-trigger-import').on('click', function() {
             if ($(this).prop('disabled')) return;
             showModal('Importing tracks…');
@@ -215,7 +220,6 @@ jQuery(document).ready(function($) {
                 if (response.success) {
                     $('#mt-import-status').text('Imported');
                     $('#mt-trigger-import').text('Re‑import Tracks');
-                    $('#mt-trigger-import').prop('disabled', false);
                 } else {
                     alert('Import failed.');
                 }

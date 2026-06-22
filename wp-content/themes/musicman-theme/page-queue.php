@@ -49,10 +49,10 @@ get_header(); ?>
         </div>
         <div id="queueBulkBar" style="display:none; background:#fff3cd; padding:2px 8px; border:1px solid #ffeeba; align-items:center; gap:4px; border-radius:2px;">
             <span><i class="fas fa-layer-group"></i> <span id="queueSelectedCount">0</span> selected</span>
-            <button id="queueBulkStartBtn" class="btn-sm btn-success"><i class="fas fa-play"></i></button>
-            <button id="queueBulkPauseBtn" class="btn-sm btn-warning"><i class="fas fa-pause"></i></button>
-            <button id="queueBulkStopBtn" class="btn-sm btn-danger"><i class="fas fa-stop"></i></button>
-            <button id="queueBulkDeleteBtn" class="btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+            <button id="queueBulkStartBtn" class="btn-sm btn-success" title="Start"><i class="fas fa-play"></i></button>
+            <button id="queueBulkPauseBtn" class="btn-sm btn-warning" title="Pause"><i class="fas fa-pause"></i></button>
+            <button id="queueBulkStopBtn" class="btn-sm btn-danger" title="Stop"><i class="fas fa-stop"></i></button>
+            <button id="queueBulkDeleteBtn" class="btn-sm btn-danger" title="Delete"><i class="fas fa-trash"></i></button>
         </div>
     </div>
     <div class="table-wrapper" id="queueTableWrapper">
@@ -74,5 +74,19 @@ get_header(); ?>
         </table>
     </div>
 </div>
+
+<style>
+    .queue-stats { background: #f8f9fa; padding: 15px; border-bottom: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center; }
+    .stat-group { display: flex; gap: 15px; }
+    .stat-item { font-size: 12px; display: flex; align-items: center; gap: 5px; }
+    .filter-bar { background: #fff; padding: 10px 15px; border-bottom: 1px solid #dee2e6; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .toolbar { padding: 10px 15px; background: #f1f3f5; border-bottom: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center; }
+    .table-wrapper { padding: 15px; }
+    .data-table { width: 100%; border-collapse: collapse; background: #fff; }
+    .data-table th { text-align: left; padding: 10px; border-bottom: 2px solid #dee2e6; color: #495057; }
+    .data-table td { padding: 10px; border-bottom: 1px solid #eee; vertical-align: middle; }
+    .checkbox-col { width: 30px; text-align: center; }
+    .status-badge { padding: 3px 8px; border-radius: 12px; font-size: 10px; font-weight: bold; text-transform: uppercase; }
+</style>
 
 <?php get_footer(); ?>

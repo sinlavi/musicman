@@ -54,7 +54,6 @@ class MusicMan_Track extends MusicMan_Base
         add_action('wp', [$this, 'count_view']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_scripts']);
         add_action('admin_footer', [$this, 'render_import_modal']);
-        add_filter('single_template', [$this, 'load_single_template']);
     }
 
     // -------------------------------------------------------------------------
@@ -146,7 +145,7 @@ class MusicMan_Track extends MusicMan_Base
         ?>
         <input type="text" id="mt-search-input" placeholder="Search track, artist, album or ID..." style="width:70%">
         <button type="button" id="mt-search-btn" class="button">Search</button>
-        <span id="mt-search-spinner" style="display:none; margin-left:8px;">Loading...</span>
+        <span id="mt-search-spinner" class="spinner" style="float:none; margin-left:8px;"></span>
         <div id="mt-search-results"
              style="margin-top:8px; max-height:200px; overflow:auto; background:#f9f9f9; border:1px solid #ddd; display:none;"></div>
         <?php
@@ -290,7 +289,9 @@ class MusicMan_Track extends MusicMan_Base
         $track = get_post_meta($post_id, 'trackName', true);
         $artist = get_post_meta($post_id, 'artistName', true);
         if (empty(get_the_title($post_id)) && $track && $artist) {
+            remove_action('save_post_' . self::POST_TYPE, [$this, 'auto_set_title_tags_and_thumbnail'], 20);
             wp_update_post(['ID' => $post_id, 'post_title' => "$track – $artist"]);
+            add_action('save_post_' . self::POST_TYPE, [$this, 'auto_set_title_tags_and_thumbnail'], 20);
         }
 
         $genre = get_post_meta($post_id, 'primaryGenreName', true);
@@ -625,16 +626,5 @@ class MusicMan_Track extends MusicMan_Base
             }
         </style>
         <?php
-    }
-
-    public function load_single_template($template)
-    {
-        if (is_singular(self::POST_TYPE)) {
-            $plugin_template = MUSICMAN_DIR . 'templates/single-musicman_track.php';
-            if (file_exists($plugin_template)) {
-                return $plugin_template;
-            }
-        }
-        return $template;
     }
 }

@@ -148,14 +148,14 @@ class MusicMan {
                     <div class="welcome-panel-column">
                         <h3>Active Operations</h3>
                         <ul>
-                            <li><span class="dashicons dashicons-download"></span> <strong><?php echo $stats['queue']; ?></strong> Items in Queue</li>
+                            <li><span class="dashicons dashicons-download"></span> <strong><?php echo $stats['queue']; ?></strong> Items in Download Queue</li>
                             <li><span class="dashicons dashicons-admin-links"></span> <strong><?php echo $stats['mirrors']; ?></strong> Mirror Links</li>
                         </ul>
                     </div>
                 </div>
             </div>
 
-            <h2 style="margin-top: 20px;">Recent Queue Activity</h2>
+            <h2 style="margin-top: 20px;">Recent Download Queue Activity</h2>
             <table class="wp-list-table widefat fixed striped">
                 <thead>
                     <tr>
@@ -183,7 +183,7 @@ class MusicMan {
                             </tr>";
                         }
                     } else {
-                        echo "<tr><td colspan='6'>No active queue items found.</td></tr>";
+                        echo "<tr><td colspan='6'>No active download queue items found.</td></tr>";
                     }
                     ?>
                 </tbody>
@@ -228,7 +228,7 @@ class MusicMan {
           <div class="main-content">
             <div class="tabs" style="display: flex; background: #f0f0f1; border-bottom: 1px solid #c3c4c7; padding: 5px 10px 0;">
                 <div class="tab active" data-tab="browse" style="padding: 8px 15px; background: #fff; border: 1px solid #c3c4c7; border-bottom: none; cursor: pointer; margin-right: 5px; border-radius: 4px 4px 0 0;">Browse</div>
-                <div class="tab" data-tab="queue" style="padding: 8px 15px; background: #e0e0e0; border: 1px solid #c3c4c7; border-bottom: none; cursor: pointer; margin-right: 5px; border-radius: 4px 4px 0 0;">Queue</div>
+                <div class="tab" data-tab="queue" style="padding: 8px 15px; background: #e0e0e0; border: 1px solid #c3c4c7; border-bottom: none; cursor: pointer; margin-right: 5px; border-radius: 4px 4px 0 0;">Download Queue</div>
                 <div class="tab" data-tab="stats" style="padding: 8px 15px; background: #e0e0e0; border: 1px solid #c3c4c7; border-bottom: none; cursor: pointer; border-radius: 4px 4px 0 0;">Stats</div>
             </div>
 
@@ -241,8 +241,8 @@ class MusicMan {
             </div>
 
             <div id="queue-pane" class="tab-pane" style="display: none; padding: 20px;">
-                <h2>Operations Queue</h2>
-                <div id="admin-queue-list">Loading queue...</div>
+                <h2>Operations Download Queue</h2>
+                <div id="admin-queue-list">Loading download queue...</div>
             </div>
 
             <div id="stats-pane" class="tab-pane" style="display: none; padding: 20px;">

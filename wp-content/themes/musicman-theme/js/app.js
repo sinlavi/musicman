@@ -7,9 +7,9 @@ const API_ROOT = musicmanSettings.root + 'musicman/v1';
 document.addEventListener('DOMContentLoaded', () => {
     initSearch();
     if (document.getElementById('queueBody')) {
-        loadQueue();
-        setInterval(loadQueue, 15000);
-        initQueueControls();
+        loadDownloadQueue();
+        setInterval(loadDownloadQueue, 15000);
+        initDownloadQueueControls();
     }
     initAudioPlayer();
     initMobileControls();
@@ -186,7 +186,7 @@ async function updateRightPanel(item) {
                 <i class="fas fa-play"></i> Play Preview
             </button>
             <button class="btn btn-success" style="width:100%; margin-top:5px;" data-add-to-queue="${id}">
-                <i class="fas fa-download"></i> Add to Queue
+                <i class="fas fa-download"></i> Add to Download Queue
             </button>
             <hr>
             <div id="props-mirrors">Loading mirrors...</div>
@@ -194,7 +194,6 @@ async function updateRightPanel(item) {
             <div id="props-lyrics">Loading lyrics...</div>
         `;
 
-        // Load extra data asynchronously
         setTimeout(async () => {
             const mirrorsCont = document.getElementById('props-mirrors');
             const lyricsCont = document.getElementById('props-lyrics');
@@ -233,7 +232,7 @@ async function updateRightPanel(item) {
 
 let currentQueueItems = [];
 
-async function loadQueue() {
+async function loadDownloadQueue() {
     const tbody = document.getElementById('queueBody');
     if (!tbody) return;
     const filter = document.getElementById('queueStatusFilter').value;
@@ -241,12 +240,12 @@ async function loadQueue() {
         const data = await apiCall(`/queue?status=${filter}`);
         if (data.items) {
             currentQueueItems = data.items;
-            filterQueueItems();
+            filterDownloadQueueItems();
         }
     } catch (e) {}
 }
 
-function filterQueueItems() {
+function filterDownloadQueueItems() {
     const searchTerm = document.getElementById('queueSearchFilter').value.toLowerCase();
     const sortBy = document.getElementById('queueSortBy').value;
 
@@ -268,15 +267,15 @@ function filterQueueItems() {
         return a.id - b.id;
     });
 
-    renderQueueTable(filtered);
-    updateQueueStats(currentQueueItems);
+    renderDownloadQueueTable(filtered);
+    updateDownloadQueueStats(currentQueueItems);
     document.getElementById('queueFilterCount').textContent = `Showing: ${filtered.length}`;
 }
 
-function renderQueueTable(items) {
+function renderDownloadQueueTable(items) {
     const tbody = document.getElementById('queueBody');
     if (items.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="empty-msg">No items in queue.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-msg">No items in download queue.</td></tr>';
         return;
     }
     tbody.innerHTML = items.map(item => {
@@ -289,19 +288,19 @@ function renderQueueTable(items) {
             <td>${item.quality}</td>
             <td><span class="status-badge status-${item.status}">${item.status}</span></td>
             <td>
-                <button class="btn-sm btn-danger" onclick="deleteQueueItem(${item.id})"><i class="fas fa-trash"></i></button>
-                ${(item.status === 'failed' || item.status === 'stopped') ? `<button class="btn-sm btn-warning" onclick="updateQueueStatus(${item.id}, 'pending')"><i class="fas fa-redo"></i></button>` : ''}
+                <button class="btn-sm btn-danger" onclick="deleteDownloadQueueItem(${item.id})"><i class="fas fa-trash"></i></button>
+                ${(item.status === 'failed' || item.status === 'stopped') ? `<button class="btn-sm btn-warning" onclick="updateDownloadQueueStatus(${item.id}, 'pending')"><i class="fas fa-redo"></i></button>` : ''}
             </td>
             <td>${item.error_message || '—'}</td>
         </tr>
     `}).join('');
 
     document.querySelectorAll('.queue-checkbox').forEach(cb => {
-        cb.addEventListener('change', updateQueueBulkBar);
+        cb.addEventListener('change', updateDownloadQueueBulkBar);
     });
 }
 
-function updateQueueStats(items) {
+function updateDownloadQueueStats(items) {
     const stats = { pending: 0, downloading: 0, paused: 0, completed: 0, failed: 0 };
     items.forEach(i => { if (stats[i.status] !== undefined) stats[i.status]++; });
     document.getElementById('statPending').textContent = stats.pending;
@@ -312,37 +311,37 @@ function updateQueueStats(items) {
     document.getElementById('queueStats').textContent = `${items.length} total`;
 }
 
-function initQueueControls() {
-    document.getElementById('queueStatusFilter').addEventListener('change', loadQueue);
-    document.getElementById('queueSearchFilter').addEventListener('input', filterQueueItems);
-    document.getElementById('queueSortBy').addEventListener('change', filterQueueItems);
-    document.getElementById('refreshQueueBtn').addEventListener('click', loadQueue);
+function initDownloadQueueControls() {
+    document.getElementById('queueStatusFilter').addEventListener('change', loadDownloadQueue);
+    document.getElementById('queueSearchFilter').addEventListener('input', filterDownloadQueueItems);
+    document.getElementById('queueSortBy').addEventListener('change', filterDownloadQueueItems);
+    document.getElementById('refreshQueueBtn').addEventListener('click', loadDownloadQueue);
     document.getElementById('clearQueueFilters').addEventListener('click', () => {
         document.getElementById('queueStatusFilter').value = 'all';
         document.getElementById('queueSearchFilter').value = '';
         document.getElementById('queueSortBy').value = 'added';
-        loadQueue();
+        loadDownloadQueue();
     });
 
     document.getElementById('queueSelectAll').addEventListener('change', (e) => {
         document.querySelectorAll('.queue-checkbox').forEach(cb => cb.checked = e.target.checked);
-        updateQueueBulkBar();
+        updateDownloadQueueBulkBar();
     });
 
     document.getElementById('queueSelectAllBtn').addEventListener('click', () => {
         document.querySelectorAll('.queue-checkbox').forEach(cb => cb.checked = true);
-        updateQueueBulkBar();
+        updateDownloadQueueBulkBar();
     });
 
     document.getElementById('queueSelectNoneBtn').addEventListener('click', () => {
         document.querySelectorAll('.queue-checkbox').forEach(cb => cb.checked = false);
-        updateQueueBulkBar();
+        updateDownloadQueueBulkBar();
     });
 
     document.getElementById('clearFailedBtn').addEventListener('click', async () => {
         if (confirm('Clear all failed tasks?')) {
             await apiCall('/queue?status=failed', 'DELETE');
-            loadQueue();
+            loadDownloadQueue();
         }
     });
 
@@ -351,45 +350,44 @@ function initQueueControls() {
         for (const item of failed) {
             await apiCall(`/queue?id=${item.id}&status=pending`, 'PUT');
         }
-        loadQueue();
+        loadDownloadQueue();
     });
 
-    // Bulk actions
     document.getElementById('queueBulkDeleteBtn').addEventListener('click', async () => {
         const ids = Array.from(document.querySelectorAll('.queue-checkbox:checked')).map(cb => cb.value);
         if (ids.length > 0 && confirm(`Delete ${ids.length} selected items?`)) {
             await apiCall('/queue', 'DELETE', { id: ids });
-            loadQueue();
+            loadDownloadQueue();
         }
     });
 
-    document.getElementById('queueBulkStartBtn').addEventListener('click', () => bulkUpdateQueueStatus('downloading'));
-    document.getElementById('queueBulkPauseBtn').addEventListener('click', () => bulkUpdateQueueStatus('paused'));
-    document.getElementById('queueBulkStopBtn').addEventListener('click', () => bulkUpdateQueueStatus('stopped'));
+    document.getElementById('queueBulkStartBtn').addEventListener('click', () => bulkUpdateDownloadQueueStatus('downloading'));
+    document.getElementById('queueBulkPauseBtn').addEventListener('click', () => bulkUpdateDownloadQueueStatus('paused'));
+    document.getElementById('queueBulkStopBtn').addEventListener('click', () => bulkUpdateDownloadQueueStatus('stopped'));
 }
 
-async function bulkUpdateQueueStatus(status) {
+async function bulkUpdateDownloadQueueStatus(status) {
     const ids = Array.from(document.querySelectorAll('.queue-checkbox:checked')).map(cb => cb.value);
     if (ids.length > 0) {
         await apiCall('/queue', 'PUT', { id: ids, status: status });
-        loadQueue();
+        loadDownloadQueue();
     }
 }
 
-function updateQueueBulkBar() {
+function updateDownloadQueueBulkBar() {
     const count = document.querySelectorAll('.queue-checkbox:checked').length;
     document.getElementById('queueSelectedCount').textContent = count;
     document.getElementById('queueBulkBar').style.display = count > 0 ? 'flex' : 'none';
 }
 
-window.deleteQueueItem = async (id) => {
+window.deleteDownloadQueueItem = async (id) => {
     await apiCall(`/queue?id=${id}`, 'DELETE');
-    loadQueue();
+    loadDownloadQueue();
 };
 
-window.updateQueueStatus = async (id, status) => {
+window.updateDownloadQueueStatus = async (id, status) => {
     await apiCall(`/queue?id=${id}&status=${status}`, 'PUT');
-    loadQueue();
+    loadDownloadQueue();
 };
 
 function initBulkControls() {
@@ -438,10 +436,10 @@ function initBulkControls() {
                 }
             }
 
-            showToast(`Added ${selected.length} items to queue`);
+            showToast(`Added ${selected.length} items to download queue`);
             bulkAddBtn.disabled = false;
             bulkAddBtn.innerHTML = '<i class="fas fa-plus"></i> Import';
-            loadQueue();
+            loadDownloadQueue();
         });
     }
 }
@@ -539,12 +537,12 @@ function initActionButtons() {
             try {
                 const res = await apiCall('/queue', 'POST', { trackId });
                 if (res.success) {
-                    showToast('Added to queue');
-                    loadQueue();
+                    showToast('Added to download queue');
+                    loadDownloadQueue();
                 }
-                else showToast('Error adding to queue', true);
+                else showToast('Error adding to download queue', true);
             } catch (err) {
-                showToast('Error adding to queue', true);
+                showToast('Error adding to download queue', true);
             }
         }
     });

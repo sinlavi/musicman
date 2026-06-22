@@ -65,6 +65,6 @@
         <i class="fas fa-home"></i> Home
       </div>
       <div class="tab <?php echo is_page('queue') ? 'active' : ''; ?>" onclick="window.location.href='<?php echo home_url('/queue'); ?>'">
-        <i class="fas fa-tasks"></i> Queue
+        <i class="fas fa-tasks"></i> Download Queue
       </div>
     </div>
